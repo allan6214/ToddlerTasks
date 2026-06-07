@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 
 const MORNING_TASKS = [
   { id: "wake", label: "Wake Up", emoji: "🌞" },
@@ -115,7 +115,7 @@ function TaskTile({ task, completed, onTap, palette }) {
         boxShadow: completed
           ? `0 12px 0 0 ${palette.accentSoft}, 0 18px 30px rgba(0,0,0,0.18)`
           : "0 10px 0 0 rgba(0,0,0,0.06), 0 16px 30px rgba(0,0,0,0.12)",
-        display: "flex",
+        display: "inline-flex",
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
@@ -126,6 +126,7 @@ function TaskTile({ task, completed, onTap, palette }) {
         userSelect: "none",
         position: "relative",
         overflow: "hidden",
+        scrollSnapAlign: "start",
       }}
     >
       <div
@@ -180,6 +181,7 @@ export default function RoutineDashboard() {
   const [now, setNow] = useState(() => new Date());
   const [mode, setMode] = useState(() => getMode(new Date()));
   const [completedByMode, setCompletedByMode] = useState({ morning: {}, evening: {} });
+  const railRef = useRef(null);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -205,6 +207,21 @@ export default function RoutineDashboard() {
 
   const resetMode = () => {
     setCompletedByMode((prev) => ({ ...prev, [mode]: {} }));
+  };
+
+  const scrollRail = (direction) => {
+    const el = railRef.current;
+    if (!el) return;
+
+    const delta = direction * 300;
+    try {
+      el.scrollBy({ left: delta, behavior: "smooth" });
+      return;
+    } catch {
+      // Older iOS Safari can throw on object-form scrollBy.
+    }
+
+    el.scrollLeft += delta;
   };
 
   return (
@@ -264,20 +281,52 @@ export default function RoutineDashboard() {
         ))}
       </div>
 
+      <div style={{ display: "flex", justifyContent: "space-between", padding: "0 56px 8px", flexShrink: 0 }}>
+        <button
+          onClick={() => scrollRail(-1)}
+          style={{
+            border: "none",
+            borderRadius: 999,
+            padding: "10px 20px",
+            fontSize: 22,
+            fontWeight: 800,
+            background: "rgba(255,255,255,0.82)",
+            color: palette.text,
+          }}
+        >
+          ◀
+        </button>
+        <button
+          onClick={() => scrollRail(1)}
+          style={{
+            border: "none",
+            borderRadius: 999,
+            padding: "10px 20px",
+            fontSize: 22,
+            fontWeight: 800,
+            background: "rgba(255,255,255,0.82)",
+            color: palette.text,
+          }}
+        >
+          ▶
+        </button>
+      </div>
+
       {/* Horizontal scrolling row */}
       <div
+        ref={railRef}
         style={{
-          display: "flex",
-          overflowX: "auto",
+          display: "block",
+          whiteSpace: "nowrap",
+          overflowX: "scroll",
           overflowY: "hidden",
           padding: "10px 56px 64px",
-          gap: 0,
           flex: 1,
-          alignItems: "center",
           scrollbarWidth: "none",
           WebkitOverflowScrolling: "touch",
-          touchAction: "pan-x",
+          touchAction: "auto",
           overscrollBehaviorX: "contain",
+          scrollSnapType: "x proximity",
         }}
       >
         {tasks.map((task) => (
