@@ -3,7 +3,7 @@ import React, { useEffect, useMemo, useState } from "react";
 const MORNING_TASKS = [
   { id: "wake", label: "Wake Up", emoji: "🌞" },
   { id: "potty", label: "Potty", emoji: "🚽" },
-  { id: "brush-am", label: "Brush Teeth", emoji: "🪥" },
+  { id: "brush-am", label: "Brush Teeth", emoji: "🦷" },
   { id: "dress", label: "Get Dressed", emoji: "👕" },
   { id: "breakfast", label: "Eat Breakfast", emoji: "🥣" },
   { id: "bag", label: "Pack Bag", emoji: "🎒" },
@@ -12,7 +12,7 @@ const MORNING_TASKS = [
 const EVENING_TASKS = [
   { id: "dinner", label: "Dinner", emoji: "🍽️" },
   { id: "bath", label: "Bath Time", emoji: "🛁" },
-  { id: "brush-pm", label: "Brush Teeth", emoji: "🪥" },
+  { id: "brush-pm", label: "Brush Teeth", emoji: "🦷" },
   { id: "pjs", label: "Put On PJs", emoji: "🌙" },
   { id: "story", label: "Story Time", emoji: "📚" },
   { id: "lights", label: "Lights Out", emoji: "⭐" },
@@ -127,15 +127,6 @@ function TaskTile({ task, completed, onTap, palette }) {
         position: "relative",
         overflow: "hidden",
       }}
-      onPointerDown={(e) => {
-        e.currentTarget.style.transform = "scale(0.92) translateY(8px)";
-      }}
-      onPointerUp={(e) => {
-        e.currentTarget.style.transform = completed ? "scale(0.96) translateY(6px)" : "scale(1)";
-      }}
-      onPointerLeave={(e) => {
-        e.currentTarget.style.transform = completed ? "scale(0.96) translateY(6px)" : "scale(1)";
-      }}
     >
       <div
         style={{
@@ -226,7 +217,7 @@ export default function RoutineDashboard() {
         flexDirection: "column",
         fontFamily: "'Baloo 2','Comic Sans MS',system-ui,sans-serif",
         overflow: "hidden",
-        touchAction: "manipulation",
+        touchAction: "auto",
       }}
     >
       <style>{`
@@ -284,6 +275,9 @@ export default function RoutineDashboard() {
           flex: 1,
           alignItems: "center",
           scrollbarWidth: "none",
+          WebkitOverflowScrolling: "touch",
+          touchAction: "pan-x",
+          overscrollBehaviorX: "contain",
         }}
       >
         {tasks.map((task) => (
