@@ -1,11 +1,15 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import legacy from '@vitejs/plugin-legacy'
 import { VitePWA } from 'vite-plugin-pwa'
 
 // https://vite.dev/config/
 export default defineConfig({
   base: './',
   plugins: [
+    legacy({
+      targets: ['defaults', 'ios >= 12'],
+    }),
     react(),
     VitePWA({
       registerType: 'autoUpdate',
