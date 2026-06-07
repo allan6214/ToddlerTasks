@@ -281,7 +281,16 @@ export default function RoutineDashboard() {
         ))}
       </div>
 
-      <div style={{ display: "flex", justifyContent: "space-between", padding: "0 56px 8px", flexShrink: 0 }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          padding: "0 20px 8px",
+          flexShrink: 0,
+          width: "100%",
+          boxSizing: "border-box",
+        }}
+      >
         <button
           onClick={() => scrollRail(-1)}
           style={{
