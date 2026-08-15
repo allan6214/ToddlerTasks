@@ -1,17 +1,819 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#1f7a8c" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-    <meta name="apple-mobile-web-app-title" content="Toddler Tasks" />
-    <title>Toddler Tasks</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
-  </body>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Toddler Tasks</title>
+  <style>
+    /* ── Reset ─────────────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      width: 100%; height: 100%;
+      overflow: hidden;
+      -webkit-text-size-adjust: 100%;
+    }
+
+    body {
+      font-family: 'Chalkboard SE', 'Comic Sans MS', cursive, system-ui, sans-serif;
+    }
+
+    /* ── CSS variables (set by JS on mode change) ───────────────────────── */
+    :root {
+      --bg-start: #C9D6FF;
+      --bg-mid:   #B6C4FF;
+      --bg-end:   #9AAEEB;
+      --accent:     #7B6CF6;
+      --accent-soft:#D8D4FF;
+      --text:       #3B3566;
+      --tile-bg:    #FBFAFF;
+      --divider:    rgba(59,53,102,0.12);
+    }
+
+    /* ── App shell ──────────────────────────────────────────────────────── */
+    #app {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: linear-gradient(160deg, var(--bg-start) 0%, var(--bg-mid) 50%, var(--bg-end) 100%);
+      display: -webkit-flex;
+      display: flex;
+      -webkit-flex-direction: column;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ── Shared header ──────────────────────────────────────────────────── */
+    #hd {
+      display: -webkit-flex;
+      display: flex;
+      -webkit-align-items: center;
+      align-items: center;
+      padding: 10px 28px 6px;
+      -webkit-flex-shrink: 0;
+      flex-shrink: 0;
+    }
+    #hd-icon  { font-size: 26px; margin-right: 10px; }
+    #hd-title { font-size: 22px; font-weight: 900; color: var(--text); }
+
+    /* ── Lanes wrapper ──────────────────────────────────────────────────── */
+    #lanes {
+      display: -webkit-flex;
+      display: flex;
+      -webkit-flex-direction: column;
+      flex-direction: column;
+      -webkit-flex: 1;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* ── Divider between children ───────────────────────────────────────── */
+    .divider {
+      height: 3px;
+      background: var(--divider);
+      -webkit-flex-shrink: 0;
+      flex-shrink: 0;
+      margin: 0 24px;
+    }
+
+    /* ── One child's lane ───────────────────────────────────────────────── */
+    .lane {
+      display: -webkit-flex;
+      display: flex;
+      -webkit-flex-direction: column;
+      flex-direction: column;
+      -webkit-flex: 1;
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* ── Lane header: name + progress dots ──────────────────────────────── */
+    .lane-hd {
+      display: -webkit-flex;
+      display: flex;
+      -webkit-align-items: center;
+      align-items: center;
+      padding: 10px 28px 6px;
+      -webkit-flex-shrink: 0;
+      flex-shrink: 0;
+    }
+    .child-name {
+      font-size: 22px;
+      font-weight: 900;
+      color: var(--text);
+    }
+    .dots {
+      display: -webkit-flex;
+      display: flex;
+      margin-left: auto;
+    }
+    .dot {
+      width: 15px;
+      height: 15px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.55);
+      border: 2.5px solid var(--accent);
+      margin-left: 7px;
+      -webkit-transition: background 0.3s ease;
+      transition: background 0.3s ease;
+      -webkit-flex-shrink: 0;
+      flex-shrink: 0;
+    }
+    .dot.filled { background: var(--accent); }
+
+    /* ── Scroll viewport + track ────────────────────────────────────────── */
+    .scroll-vp {
+      -webkit-flex: 1;
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+    .scroll-track {
+      display: -webkit-inline-flex;
+      display: inline-flex;
+      -webkit-align-items: center;
+      align-items: center;
+      position: absolute;
+      top: 0; left: 0;
+      height: 100%;
+      padding: 8px 28px 12px;
+      will-change: transform;
+      cursor: -webkit-grab;
+      cursor: grab;
+    }
+
+    /* ── Task tiles ─────────────────────────────────────────────────────── */
+    .tile {
+      -webkit-flex-shrink: 0;
+      flex-shrink: 0;
+      width: 148px;
+      height: 186px;
+      border-radius: 24px;
+      border: none;
+      outline: none;
+      cursor: pointer;
+      background: var(--tile-bg);
+      box-shadow: 0 7px 0 0 rgba(0,0,0,0.06), 0 10px 20px rgba(0,0,0,0.11);
+      display: -webkit-flex;
+      display: flex;
+      -webkit-flex-direction: column;
+      flex-direction: column;
+      -webkit-align-items: center;
+      align-items: center;
+      -webkit-justify-content: center;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+      margin-right: 14px;
+      -webkit-tap-highlight-color: transparent;
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-transition: background 0.22s ease, box-shadow 0.18s ease,
+                          -webkit-transform 0.15s ease;
+      transition: background 0.22s ease, box-shadow 0.18s ease, transform 0.15s ease;
+      -webkit-transform: scale(1);
+      transform: scale(1);
+    }
+    .tile.completed {
+      background: var(--accent);
+      box-shadow: 0 8px 0 0 var(--accent-soft), 0 12px 22px rgba(0,0,0,0.18);
+      -webkit-transform: scale(0.95) translateY(4px);
+      transform: scale(0.95) translateY(4px);
+    }
+    .tile.pressing {
+      -webkit-transform: scale(0.89) translateY(6px) !important;
+      transform: scale(0.89) translateY(6px) !important;
+    }
+
+    /* Icon wrapper inside tile */
+    .tile-icon {
+      display: -webkit-flex;
+      display: flex;
+      -webkit-align-items: center;
+      align-items: center;
+      -webkit-justify-content: center;
+      justify-content: center;
+      font-size: 56px;
+      line-height: 1;
+      margin-bottom: 10px;
+      -webkit-transition: -webkit-transform 0.3s cubic-bezier(0.34,1.56,0.64,1),
+                          -webkit-filter 0.3s ease;
+      transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1), filter 0.3s ease;
+      -webkit-transform: scale(1) rotate(0deg);
+      transform: scale(1) rotate(0deg);
+    }
+    .tile.completed .tile-icon {
+      -webkit-transform: scale(1.12) rotate(-5deg);
+      transform: scale(1.12) rotate(-5deg);
+      -webkit-filter: drop-shadow(0 4px 8px rgba(0,0,0,0.15));
+      filter: drop-shadow(0 4px 8px rgba(0,0,0,0.15));
+    }
+
+    .tile-label {
+      font-size: 15px;
+      font-weight: 800;
+      color: var(--text);
+      text-align: center;
+      padding: 0 8px;
+      line-height: 1.2;
+      -webkit-transition: color 0.22s ease;
+      transition: color 0.22s ease;
+    }
+    .tile.completed .tile-label { color: #FFFFFF; }
+
+    /* Checkmark badge */
+    .checkmark {
+      position: absolute;
+      top: 8px; right: 8px;
+      width: 30px; height: 30px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.92);
+      display: -webkit-flex;
+      display: flex;
+      -webkit-align-items: center;
+      align-items: center;
+      -webkit-justify-content: center;
+      justify-content: center;
+      font-size: 16px;
+      -webkit-transform: scale(0);
+      transform: scale(0);
+      opacity: 0;
+      -webkit-transition: -webkit-transform 0.35s cubic-bezier(0.34,1.56,0.64,1),
+                          opacity 0.25s ease;
+      transition: transform 0.35s cubic-bezier(0.34,1.56,0.64,1), opacity 0.25s ease;
+    }
+    .tile.completed .checkmark {
+      -webkit-transform: scale(1);
+      transform: scale(1);
+      opacity: 1;
+    }
+
+    /* ── Celebration overlay ────────────────────────────────────────────── */
+    .celebration {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      display: -webkit-flex;
+      display: flex;
+      -webkit-flex-direction: column;
+      flex-direction: column;
+      -webkit-align-items: center;
+      align-items: center;
+      -webkit-justify-content: center;
+      justify-content: center;
+      z-index: 5;
+      overflow: hidden;
+    }
+    .cel-emoji {
+      font-size: 60px;
+      -webkit-animation: cel-bounce 1.2s ease-in-out infinite;
+      animation: cel-bounce 1.2s ease-in-out infinite;
+      -webkit-filter: drop-shadow(0 6px 14px rgba(0,0,0,0.2));
+      filter: drop-shadow(0 6px 14px rgba(0,0,0,0.2));
+    }
+    .cel-text {
+      font-size: 24px;
+      font-weight: 900;
+      color: #FFF;
+      text-shadow: 0 3px 10px rgba(0,0,0,0.2);
+      margin-top: 8px;
+      text-align: center;
+      padding: 0 16px;
+    }
+    .reset-btn {
+      margin-top: 18px;
+      font-size: 17px;
+      font-weight: 800;
+      color: var(--accent);
+      background: #FFF;
+      border: none;
+      border-radius: 999px;
+      padding: 12px 32px;
+      box-shadow: 0 7px 0 0 rgba(0,0,0,0.1);
+      cursor: pointer;
+      font-family: inherit;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .confetti-layer {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      overflow: hidden;
+      pointer-events: none;
+    }
+    .cp {
+      position: absolute;
+      top: -5%;
+      border-radius: 3px;
+      opacity: 0.9;
+      -webkit-animation: cf-fall linear infinite;
+      animation: cf-fall linear infinite;
+    }
+
+    /* ── Keyframes ──────────────────────────────────────────────────────── */
+    @-webkit-keyframes cf-fall {
+      0%   { -webkit-transform: translateY(0) rotate(0deg); opacity: 0.95; }
+      100% { -webkit-transform: translateY(115vh) rotate(540deg); opacity: 0.6; }
+    }
+    @keyframes cf-fall {
+      0%   { transform: translateY(0) rotate(0deg); opacity: 0.95; }
+      100% { transform: translateY(115vh) rotate(540deg); opacity: 0.6; }
+    }
+    @-webkit-keyframes cel-bounce {
+      0%, 100% { -webkit-transform: translateY(0) scale(1); }
+      50%       { -webkit-transform: translateY(-12px) scale(1.06); }
+    }
+    @keyframes cel-bounce {
+      0%, 100% { transform: translateY(0) scale(1); }
+      50%       { transform: translateY(-12px) scale(1.06); }
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="hd">
+      <span id="hd-icon"></span>
+      <span id="hd-title"></span>
+    </div>
+    <div id="lanes"></div>
+  </div>
+
+  <script>
+  'use strict';
+
+  /* ── Config ────────────────────────────────────────────────────────────── */
+  var CHILDREN = [
+    { name: 'Child 1', emoji: '⭐' },
+    { name: 'Child 2', emoji: '🌈' },
+  ];
+
+  var MORNING_TASKS = [
+    { id: 'wake',      label: 'Wake Up',       emoji: '🌞' },
+    { id: 'potty',     label: 'Potty',         emoji: '🚽' },
+    { id: 'brush-am',  label: 'Brush Teeth',   svg: true  },
+    { id: 'dress',     label: 'Get Dressed',   emoji: '👕' },
+    { id: 'breakfast', label: 'Eat Breakfast', emoji: '🥣' },
+    { id: 'bag',       label: 'Pack Bag',      emoji: '🎒' },
+  ];
+
+  var EVENING_TASKS = [
+    { id: 'dinner',   label: 'Dinner',       emoji: '🍽️' },
+    { id: 'bath',     label: 'Bath Time',    emoji: '🛁'  },
+    { id: 'brush-pm', label: 'Brush Teeth',  svg: true   },
+    { id: 'pjs',      label: 'Put On PJs',   emoji: '🌙' },
+    { id: 'story',    label: 'Story Time',   emoji: '📚' },
+    { id: 'lights',   label: 'Lights Out',   emoji: '⭐' },
+  ];
+
+  var PALETTES = {
+    morning: {
+      bgStart: '#FFE9C7', bgMid: '#FFD3A8', bgEnd: '#FFC2C2',
+      accent: '#FF8A5B', accentSoft: '#FFD8B5',
+      text: '#6B4226', tileBg: '#FFFDF8',
+      divider: 'rgba(107,66,38,0.12)',
+      title: 'Good Morning!', icon: '☀️',
+    },
+    evening: {
+      bgStart: '#C9D6FF', bgMid: '#B6C4FF', bgEnd: '#9AAEEB',
+      accent: '#7B6CF6', accentSoft: '#D8D4FF',
+      text: '#3B3566', tileBg: '#FBFAFF',
+      divider: 'rgba(59,53,102,0.12)',
+      title: 'Good Evening!', icon: '🌙',
+    },
+  };
+
+  var CF_COLORS = ['#FF8A5B','#FFC2C2','#FFD3A8','#7B6CF6','#9AAEEB','#FFE066','#6BCB77'];
+
+  /* ── State ─────────────────────────────────────────────────────────────── */
+  var currentMode = getMode();
+  var completed   = [{}, {}]; // completed[childIdx][taskId] = true|false
+
+  /* ── Mode detection ─────────────────────────────────────────────────────── */
+  function getMode() {
+    var now = new Date();
+    var h = now.getHours() + now.getMinutes() / 60;
+    if (h >= 5 && h < 12) return 'morning';
+    if (h >= 17 && h < 21) return 'evening';
+    var dA = Math.abs(h - 8.5);  dA = Math.min(dA, 24 - dA);
+    var dB = Math.abs(h - 19);   dB = Math.min(dB, 24 - dB);
+    return dA <= dB ? 'morning' : 'evening';
+  }
+
+  /* ── Toothbrush SVG ─────────────────────────────────────────────────────── */
+  function toothbrushSVG(done) {
+    var h  = done ? 'rgba(255,255,255,0.88)' : '#3A9FCC';
+    var b  = done ? '#7B6CF6' : '#FFFFFF';
+    var gr = done ? '#7B6CF6' : 'rgba(255,255,255,0.38)';
+    var tufts = '', ridges = '', xs = [6,14,22,30,38], ys = [66,78,90], i;
+    for (i = 0; i < xs.length; i++) {
+      tufts += '<rect x="' + xs[i] + '" y="0" width="6" height="22" rx="3" fill="' + b + '" opacity="0.93"/>';
+    }
+    for (i = 0; i < ys.length; i++) {
+      ridges += '<rect x="17" y="' + ys[i] + '" width="10" height="5" rx="2.5" fill="' + gr + '"/>';
+    }
+    return '<svg viewBox="0 0 44 130" width="34" height="64" xmlns="http://www.w3.org/2000/svg">'
+      + tufts
+      + '<rect x="2" y="20" width="40" height="20" rx="10" fill="' + h + '"/>'
+      + '<rect x="18" y="38" width="8" height="14" rx="4" fill="' + h + '"/>'
+      + '<rect x="14" y="50" width="16" height="74" rx="8" fill="' + h + '"/>'
+      + ridges
+      + '</svg>';
+  }
+
+  /* ── CSS variable helper ────────────────────────────────────────────────── */
+  function setVar(name, val) {
+    document.documentElement.style.setProperty(name, val);
+  }
+
+  function applyPalette(p) {
+    setVar('--bg-start',    p.bgStart);
+    setVar('--bg-mid',      p.bgMid);
+    setVar('--bg-end',      p.bgEnd);
+    setVar('--accent',      p.accent);
+    setVar('--accent-soft', p.accentSoft);
+    setVar('--text',        p.text);
+    setVar('--tile-bg',     p.tileBg);
+    setVar('--divider',     p.divider);
+  }
+
+  /* ── DOM build ──────────────────────────────────────────────────────────── */
+  function buildAll() {
+    var palette = PALETTES[currentMode];
+    var tasks   = currentMode === 'morning' ? MORNING_TASKS : EVENING_TASKS;
+
+    applyPalette(palette);
+
+    // Header
+    document.getElementById('hd-icon').textContent  = palette.icon;
+    document.getElementById('hd-title').textContent = palette.title;
+
+    // Lanes
+    var lanesEl = document.getElementById('lanes');
+    lanesEl.innerHTML = '';
+
+    for (var ci = 0; ci < CHILDREN.length; ci++) {
+      if (ci > 0) {
+        var dv = document.createElement('div');
+        dv.className = 'divider';
+        lanesEl.appendChild(dv);
+      }
+      lanesEl.appendChild(buildLane(ci, tasks, palette));
+    }
+
+    // Attach drag scroll to each viewport
+    var viewports = document.querySelectorAll('.scroll-vp');
+    for (var vi = 0; vi < viewports.length; vi++) {
+      makeDragScroll(viewports[vi]);
+    }
+  }
+
+  function buildLane(ci, tasks, palette) {
+    var lane = document.createElement('div');
+    lane.className = 'lane';
+    lane.setAttribute('data-ci', ci);
+
+    // Lane header
+    var hd = document.createElement('div');
+    hd.className = 'lane-hd';
+
+    var nm = document.createElement('span');
+    nm.className = 'child-name';
+    nm.textContent = CHILDREN[ci].emoji + ' ' + CHILDREN[ci].name;
+    hd.appendChild(nm);
+
+    var dotsEl = document.createElement('div');
+    dotsEl.className = 'dots';
+    for (var ti = 0; ti < tasks.length; ti++) {
+      var dot = document.createElement('div');
+      dot.className = 'dot' + (completed[ci][tasks[ti].id] ? ' filled' : '');
+      dot.setAttribute('data-ci', ci);
+      dot.setAttribute('data-tid', tasks[ti].id);
+      dotsEl.appendChild(dot);
+    }
+    hd.appendChild(dotsEl);
+    lane.appendChild(hd);
+
+    // Scroll viewport + track
+    var vp = document.createElement('div');
+    vp.className = 'scroll-vp';
+    vp.setAttribute('data-ci', ci);
+
+    var track = document.createElement('div');
+    track.className = 'scroll-track';
+
+    for (var tIdx = 0; tIdx < tasks.length; tIdx++) {
+      track.appendChild(buildTile(tasks[tIdx], ci));
+    }
+    vp.appendChild(track);
+    lane.appendChild(vp);
+
+    // Celebration overlay
+    lane.appendChild(buildCelebration(ci, palette, tasks));
+
+    return lane;
+  }
+
+  function buildTile(task, ci) {
+    var done = !!completed[ci][task.id];
+    var tile = document.createElement('button');
+    tile.className = 'tile' + (done ? ' completed' : '');
+    tile.type = 'button';
+    tile.setAttribute('data-ci', ci);
+    tile.setAttribute('data-tid', task.id);
+
+    var icon = document.createElement('div');
+    icon.className = 'tile-icon';
+    if (task.svg) {
+      icon.innerHTML = toothbrushSVG(done);
+    } else {
+      icon.textContent = task.emoji;
+    }
+
+    var label = document.createElement('div');
+    label.className = 'tile-label';
+    label.textContent = task.label;
+
+    var chk = document.createElement('div');
+    chk.className = 'checkmark';
+    chk.textContent = '✅';
+
+    tile.appendChild(icon);
+    tile.appendChild(label);
+    tile.appendChild(chk);
+    return tile;
+  }
+
+  function buildCelebration(ci, palette, tasks) {
+    var done = tasks.every(function(t) { return completed[ci][t.id]; });
+    var cel = document.createElement('div');
+    cel.className = 'celebration';
+    cel.setAttribute('data-ci', ci);
+    cel.style.display = done ? 'flex' : 'none';
+    cel.style.background = 'radial-gradient(circle at 50% 40%, ' + palette.accentSoft + ' 0%, ' + palette.accent + ' 100%)';
+
+    // Confetti layer
+    var layer = document.createElement('div');
+    layer.className = 'confetti-layer';
+    for (var i = 0; i < 40; i++) {
+      var pc = document.createElement('div');
+      pc.className = 'cp';
+      var sz = 10 + Math.random() * 12;
+      pc.style.left            = (Math.random() * 100) + '%';
+      pc.style.width           = sz + 'px';
+      pc.style.height          = (sz * 0.4) + 'px';
+      pc.style.backgroundColor = CF_COLORS[i % CF_COLORS.length];
+      pc.style.webkitTransform = 'rotate(' + (Math.random() * 360) + 'deg)';
+      pc.style.transform       = 'rotate(' + (Math.random() * 360) + 'deg)';
+      pc.style.webkitAnimationDuration = (2.5 + Math.random() * 2) + 's';
+      pc.style.animationDuration       = (2.5 + Math.random() * 2) + 's';
+      pc.style.webkitAnimationDelay    = (Math.random() * 1.5) + 's';
+      pc.style.animationDelay          = (Math.random() * 1.5) + 's';
+      layer.appendChild(pc);
+    }
+    cel.appendChild(layer);
+
+    var emoji = document.createElement('div');
+    emoji.className = 'cel-emoji';
+    emoji.textContent = '🎉';
+
+    var text = document.createElement('div');
+    text.className = 'cel-text';
+    text.textContent = 'Great job, ' + CHILDREN[ci].name + '!';
+
+    var btn = document.createElement('button');
+    btn.className = 'reset-btn';
+    btn.type = 'button';
+    btn.textContent = 'Start Again 🔁';
+    btn.setAttribute('data-reset', ci);
+
+    cel.appendChild(emoji);
+    cel.appendChild(text);
+    cel.appendChild(btn);
+    return cel;
+  }
+
+  /* ── Tap handling ───────────────────────────────────────────────────────── */
+  document.getElementById('app').addEventListener('click', function(e) {
+    var node = e.target;
+
+    // Walk up to find a reset button
+    while (node && node !== this) {
+      if (node.getAttribute('data-reset') !== null) {
+        handleReset(parseInt(node.getAttribute('data-reset'), 10));
+        return;
+      }
+      node = node.parentNode;
+    }
+
+    // Walk up to find a tile
+    node = e.target;
+    while (node && node !== this) {
+      if (node.getAttribute('data-tid') && node.tagName === 'BUTTON') {
+        var ci  = parseInt(node.getAttribute('data-ci'), 10);
+        var tid = node.getAttribute('data-tid');
+        handleTap(ci, tid);
+        return;
+      }
+      node = node.parentNode;
+    }
+  });
+
+  // Press-in feedback via touchstart/mousedown on tiles
+  document.getElementById('app').addEventListener('touchstart', function(e) {
+    var tile = closestTile(e.target);
+    if (tile) tile.classList.add('pressing');
+  }, { passive: true });
+
+  document.getElementById('app').addEventListener('touchend', function(e) {
+    var tiles = document.querySelectorAll('.tile.pressing');
+    for (var i = 0; i < tiles.length; i++) tiles[i].classList.remove('pressing');
+  }, { passive: true });
+
+  document.getElementById('app').addEventListener('touchcancel', function() {
+    var tiles = document.querySelectorAll('.tile.pressing');
+    for (var i = 0; i < tiles.length; i++) tiles[i].classList.remove('pressing');
+  }, { passive: true });
+
+  function closestTile(node) {
+    while (node) {
+      if (node.classList && node.classList.contains('tile')) return node;
+      node = node.parentNode;
+    }
+    return null;
+  }
+
+  function handleTap(ci, tid) {
+    var tasks = currentMode === 'morning' ? MORNING_TASKS : EVENING_TASKS;
+    var wasDone = !!completed[ci][tid];
+    completed[ci][tid] = !wasDone;
+    var nowDone = !wasDone;
+
+    // Update tile
+    var tile = document.querySelector('.tile[data-ci="' + ci + '"][data-tid="' + tid + '"]');
+    if (tile) {
+      if (nowDone) {
+        tile.classList.add('completed');
+        // Update toothbrush SVG colour
+        var task = findTask(tasks, tid);
+        if (task && task.svg) {
+          var ico = tile.querySelector('.tile-icon');
+          if (ico) ico.innerHTML = toothbrushSVG(true);
+        }
+      } else {
+        tile.classList.remove('completed');
+        var task2 = findTask(tasks, tid);
+        if (task2 && task2.svg) {
+          var ico2 = tile.querySelector('.tile-icon');
+          if (ico2) ico2.innerHTML = toothbrushSVG(false);
+        }
+      }
+    }
+
+    // Update dot
+    var dot = document.querySelector('.dot[data-ci="' + ci + '"][data-tid="' + tid + '"]');
+    if (dot) {
+      if (nowDone) dot.classList.add('filled');
+      else         dot.classList.remove('filled');
+    }
+
+    // Show/hide celebration
+    var allDone = tasks.every(function(t) { return completed[ci][t.id]; });
+    var cel = document.querySelector('.celebration[data-ci="' + ci + '"]');
+    if (cel) cel.style.display = allDone ? 'flex' : 'none';
+  }
+
+  function handleReset(ci) {
+    var tasks = currentMode === 'morning' ? MORNING_TASKS : EVENING_TASKS;
+    completed[ci] = {};
+
+    for (var i = 0; i < tasks.length; i++) {
+      var t = tasks[i];
+      var tile = document.querySelector('.tile[data-ci="' + ci + '"][data-tid="' + t.id + '"]');
+      if (tile) {
+        tile.classList.remove('completed');
+        if (t.svg) {
+          var ico = tile.querySelector('.tile-icon');
+          if (ico) ico.innerHTML = toothbrushSVG(false);
+        }
+      }
+      var dot = document.querySelector('.dot[data-ci="' + ci + '"][data-tid="' + t.id + '"]');
+      if (dot) dot.classList.remove('filled');
+    }
+
+    var cel = document.querySelector('.celebration[data-ci="' + ci + '"]');
+    if (cel) cel.style.display = 'none';
+  }
+
+  function findTask(tasks, id) {
+    for (var i = 0; i < tasks.length; i++) {
+      if (tasks[i].id === id) return tasks[i];
+    }
+    return null;
+  }
+
+  /* ── Drag scroll ────────────────────────────────────────────────────────── */
+  function makeDragScroll(vp) {
+    var track = vp.querySelector('.scroll-track');
+    if (!track) return;
+
+    var s = {
+      active: false, startX: 0, startT: 0,
+      translate: 0, prevX: 0, prevTime: 0,
+      velocity: 0, rafId: null,
+    };
+
+    function applyT(x) {
+      track.style.webkitTransform = 'translateX(' + x + 'px)';
+      track.style.transform       = 'translateX(' + x + 'px)';
+      s.translate = x;
+    }
+    function getMin() {
+      var gap = track.scrollWidth - vp.offsetWidth;
+      return gap > 0 ? -gap : 0;
+    }
+    function clamp(v, lo, hi) { return v < lo ? lo : v > hi ? hi : v; }
+    function stopRAF() {
+      if (s.rafId) { cancelAnimationFrame(s.rafId); s.rafId = null; }
+    }
+    function settle() {
+      var mn = getMin();
+      var target = clamp(s.translate, mn, 0);
+      var diff   = target - s.translate;
+      if (Math.abs(diff) < 0.5) { applyT(target); return; }
+      applyT(s.translate + diff * 0.18);
+      s.rafId = requestAnimationFrame(settle);
+    }
+    function glide() {
+      var mn = getMin();
+      s.velocity *= 0.93;
+      var nxt = s.translate + s.velocity * 16;
+      if (nxt > 0 || nxt < mn) {
+        applyT(clamp(nxt, mn, 0));
+        s.velocity = 0;
+        s.rafId = requestAnimationFrame(settle);
+        return;
+      }
+      applyT(nxt);
+      if (Math.abs(s.velocity) > 0.02) s.rafId = requestAnimationFrame(glide);
+    }
+    function startDrag(x) {
+      stopRAF();
+      s.active = true; s.startX = x; s.startT = s.translate;
+      s.prevX = x; s.prevTime = Date.now(); s.velocity = 0;
+    }
+    function moveDrag(x, e) {
+      if (!s.active) return;
+      var dx = x - s.startX;
+      if (Math.abs(dx) > 8 && e) e.preventDefault();
+      var now = Date.now(), dt = now - s.prevTime || 1;
+      s.velocity = (x - s.prevX) / dt;
+      s.prevX = x; s.prevTime = now;
+      var mn = getMin(), nxt = s.startT + dx;
+      if (nxt > 0)       nxt = nxt * 0.3;
+      else if (nxt < mn) nxt = mn + (nxt - mn) * 0.3;
+      applyT(nxt);
+    }
+    function endDrag() {
+      s.active = false;
+      s.velocity *= 16;
+      s.rafId = requestAnimationFrame(glide);
+    }
+
+    vp.addEventListener('touchstart', function(e) {
+      startDrag(e.touches[0].clientX);
+    }, { passive: true });
+
+    vp.addEventListener('touchmove', function(e) {
+      moveDrag(e.touches[0].clientX, e);
+    }, { passive: false });
+
+    vp.addEventListener('touchend',    endDrag, { passive: true });
+    vp.addEventListener('touchcancel', endDrag, { passive: true });
+
+    // Mouse fallback for desktop testing
+    vp.addEventListener('mousedown', function(e) {
+      startDrag(e.clientX);
+      function onMove(ev) { moveDrag(ev.clientX, null); }
+      function onUp()   { endDrag(); window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); }
+      window.addEventListener('mousemove', onMove);
+      window.addEventListener('mouseup', onUp);
+    });
+  }
+
+  /* ── Mode timer ─────────────────────────────────────────────────────────── */
+  setInterval(function() {
+    var m = getMode();
+    if (m !== currentMode) {
+      currentMode = m;
+      completed   = [{}, {}];
+      buildAll();
+    }
+  }, 30000);
+
+  /* ── Init ───────────────────────────────────────────────────────────────── */
+  buildAll();
+  </script>
+</body>
 </html>
