@@ -146,10 +146,21 @@
       cursor: grab;
     }
 
-    /* ── Task tiles ─────────────────────────────────────────────────────── */
-    .tile {
+    /* ── Tile wrapper (holds tile + optional skip button) ───────────────── */
+    .tile-wrap {
+      display: -webkit-flex;
+      display: flex;
+      -webkit-flex-direction: column;
+      flex-direction: column;
+      -webkit-align-items: center;
+      align-items: center;
       -webkit-flex-shrink: 0;
       flex-shrink: 0;
+      margin-right: 14px;
+    }
+
+    /* ── Task tiles ─────────────────────────────────────────────────────── */
+    .tile {
       width: 148px;
       height: 186px;
       border-radius: 24px;
@@ -168,7 +179,6 @@
       justify-content: center;
       position: relative;
       overflow: hidden;
-      margin-right: 14px;
       -webkit-tap-highlight-color: transparent;
       -webkit-user-select: none;
       user-select: none;
@@ -224,6 +234,36 @@
       transition: color 0.22s ease;
     }
     .tile.completed .tile-label { color: #FFFFFF; }
+
+    /* Skipped state */
+    .tile.skipped {
+      background: rgba(160,160,185,0.22);
+      box-shadow: none;
+      -webkit-transform: scale(0.95) translateY(4px);
+      transform: scale(0.95) translateY(4px);
+    }
+    .tile.skipped .tile-icon { opacity: 0.35; }
+    .tile.skipped .tile-label {
+      opacity: 0.45;
+      text-decoration: line-through;
+      color: var(--text);
+    }
+
+    /* Skip button (below skippable tiles) */
+    .skip-btn {
+      margin-top: 7px;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text);
+      opacity: 0.5;
+      background: rgba(255,255,255,0.65);
+      border: none;
+      border-radius: 999px;
+      padding: 5px 16px;
+      cursor: pointer;
+      font-family: inherit;
+      -webkit-tap-highlight-color: transparent;
+    }
 
     /* Checkmark badge */
     .checkmark {
@@ -352,19 +392,20 @@
   var MORNING_TASKS = [
     { id: 'wake',      label: 'Wake Up',       emoji: '🌞' },
     { id: 'potty',     label: 'Potty',         emoji: '🚽' },
-    { id: 'brush-am',  label: 'Brush Teeth',   svg: true  },
+    { id: 'brush-am',  label: 'Brush Teeth',   emoji: '🪥' },
     { id: 'dress',     label: 'Get Dressed',   emoji: '👕' },
     { id: 'breakfast', label: 'Eat Breakfast', emoji: '🥣' },
     { id: 'bag',       label: 'Pack Bag',      emoji: '🎒' },
   ];
 
   var EVENING_TASKS = [
-    { id: 'dinner',   label: 'Dinner',       emoji: '🍽️' },
-    { id: 'bath',     label: 'Bath Time',    emoji: '🛁'  },
-    { id: 'brush-pm', label: 'Brush Teeth',  svg: true   },
-    { id: 'pjs',      label: 'Put On PJs',   emoji: '🌙' },
-    { id: 'story',    label: 'Story Time',   emoji: '📚' },
-    { id: 'lights',   label: 'Lights Out',   emoji: '⭐' },
+    { id: 'dinner',   label: 'Dinner',        emoji: '🍽️' },
+    { id: 'potty-pm', label: 'Use Potty',     emoji: '🚽' },
+    { id: 'bath',     label: 'Bath Time',     emoji: '🛁', skippable: true },
+    { id: 'brush-pm', label: 'Brush Teeth',   emoji: '🪥' },
+    { id: 'pjs',      label: 'Put On PJs',    emoji: '👕' },
+    { id: 'story',    label: 'Story Time',    emoji: '📚' },
+    { id: 'lights',   label: 'Lights Out',    emoji: '⭐' },
   ];
 
   var PALETTES = {
@@ -399,27 +440,6 @@
     var dA = Math.abs(h - 8.5);  dA = Math.min(dA, 24 - dA);
     var dB = Math.abs(h - 19);   dB = Math.min(dB, 24 - dB);
     return dA <= dB ? 'morning' : 'evening';
-  }
-
-  /* ── Toothbrush SVG ─────────────────────────────────────────────────────── */
-  function toothbrushSVG(done) {
-    var h  = done ? 'rgba(255,255,255,0.88)' : '#3A9FCC';
-    var b  = done ? '#7B6CF6' : '#FFFFFF';
-    var gr = done ? '#7B6CF6' : 'rgba(255,255,255,0.38)';
-    var tufts = '', ridges = '', xs = [6,14,22,30,38], ys = [66,78,90], i;
-    for (i = 0; i < xs.length; i++) {
-      tufts += '<rect x="' + xs[i] + '" y="0" width="6" height="22" rx="3" fill="' + b + '" opacity="0.93"/>';
-    }
-    for (i = 0; i < ys.length; i++) {
-      ridges += '<rect x="17" y="' + ys[i] + '" width="10" height="5" rx="2.5" fill="' + gr + '"/>';
-    }
-    return '<svg viewBox="0 0 44 130" width="34" height="64" xmlns="http://www.w3.org/2000/svg">'
-      + tufts
-      + '<rect x="2" y="20" width="40" height="20" rx="10" fill="' + h + '"/>'
-      + '<rect x="18" y="38" width="8" height="14" rx="4" fill="' + h + '"/>'
-      + '<rect x="14" y="50" width="16" height="74" rx="8" fill="' + h + '"/>'
-      + ridges
-      + '</svg>';
   }
 
   /* ── CSS variable helper ────────────────────────────────────────────────── */
@@ -487,7 +507,8 @@
     dotsEl.className = 'dots';
     for (var ti = 0; ti < tasks.length; ti++) {
       var dot = document.createElement('div');
-      dot.className = 'dot' + (completed[ci][tasks[ti].id] ? ' filled' : '');
+      var dotVal = completed[ci][tasks[ti].id];
+      dot.className = 'dot' + (dotVal ? ' filled' : '');
       dot.setAttribute('data-ci', ci);
       dot.setAttribute('data-tid', tasks[ti].id);
       dotsEl.appendChild(dot);
@@ -516,20 +537,19 @@
   }
 
   function buildTile(task, ci) {
-    var done = !!completed[ci][task.id];
+    var val = completed[ci][task.id]; // undefined, 'done', or 'skipped'
+    var wrap = document.createElement('div');
+    wrap.className = 'tile-wrap';
+
     var tile = document.createElement('button');
-    tile.className = 'tile' + (done ? ' completed' : '');
+    tile.className = 'tile' + (val === 'done' ? ' completed' : val === 'skipped' ? ' skipped' : '');
     tile.type = 'button';
     tile.setAttribute('data-ci', ci);
     tile.setAttribute('data-tid', task.id);
 
     var icon = document.createElement('div');
     icon.className = 'tile-icon';
-    if (task.svg) {
-      icon.innerHTML = toothbrushSVG(done);
-    } else {
-      icon.textContent = task.emoji;
-    }
+    icon.textContent = task.emoji;
 
     var label = document.createElement('div');
     label.className = 'tile-label';
@@ -537,16 +557,30 @@
 
     var chk = document.createElement('div');
     chk.className = 'checkmark';
-    chk.textContent = '✅';
+    chk.textContent = val === 'skipped' ? '⏭' : '✅';
 
     tile.appendChild(icon);
     tile.appendChild(label);
     tile.appendChild(chk);
-    return tile;
+    wrap.appendChild(tile);
+
+    // Skip button for skippable tasks
+    if (task.skippable) {
+      var skipBtn = document.createElement('button');
+      skipBtn.className = 'skip-btn';
+      skipBtn.type = 'button';
+      skipBtn.textContent = 'Skip →';
+      skipBtn.setAttribute('data-ci', ci);
+      skipBtn.setAttribute('data-skip-tid', task.id);
+      skipBtn.style.display = val ? 'none' : '';
+      wrap.appendChild(skipBtn);
+    }
+
+    return wrap;
   }
 
   function buildCelebration(ci, palette, tasks) {
-    var done = tasks.every(function(t) { return completed[ci][t.id]; });
+    var done = tasks.every(function(t) { return !!completed[ci][t.id]; });
     var cel = document.createElement('div');
     cel.className = 'celebration';
     cel.setAttribute('data-ci', ci);
@@ -607,6 +641,16 @@
       node = node.parentNode;
     }
 
+    // Walk up to find a skip button
+    node = e.target;
+    while (node && node !== this) {
+      if (node.getAttribute('data-skip-tid') !== null) {
+        handleSkip(parseInt(node.getAttribute('data-ci'), 10), node.getAttribute('data-skip-tid'));
+        return;
+      }
+      node = node.parentNode;
+    }
+
     // Walk up to find a tile
     node = e.target;
     while (node && node !== this) {
@@ -646,39 +690,52 @@
 
   function handleTap(ci, tid) {
     var tasks = currentMode === 'morning' ? MORNING_TASKS : EVENING_TASKS;
-    var wasDone = !!completed[ci][tid];
-    completed[ci][tid] = !wasDone;
-    var nowDone = !wasDone;
+    var cur = completed[ci][tid]; // undefined, 'done', or 'skipped'
+    // Tap toggles between 'done' and undefined (un-skips if was skipped)
+    completed[ci][tid] = cur === 'done' ? undefined : 'done';
+    var nowDone = completed[ci][tid] === 'done';
 
-    // Update tile
     var tile = document.querySelector('.tile[data-ci="' + ci + '"][data-tid="' + tid + '"]');
     if (tile) {
-      if (nowDone) {
-        tile.classList.add('completed');
-        // Update toothbrush SVG colour
-        var task = findTask(tasks, tid);
-        if (task && task.svg) {
-          var ico = tile.querySelector('.tile-icon');
-          if (ico) ico.innerHTML = toothbrushSVG(true);
-        }
-      } else {
-        tile.classList.remove('completed');
-        var task2 = findTask(tasks, tid);
-        if (task2 && task2.svg) {
-          var ico2 = tile.querySelector('.tile-icon');
-          if (ico2) ico2.innerHTML = toothbrushSVG(false);
-        }
-      }
+      tile.classList.remove('completed', 'skipped');
+      if (nowDone) tile.classList.add('completed');
+      var chk = tile.querySelector('.checkmark');
+      if (chk) chk.textContent = '✅';
     }
 
-    // Update dot
+    // Show/hide skip button
+    var skipBtn = document.querySelector('.skip-btn[data-ci="' + ci + '"][data-skip-tid="' + tid + '"]');
+    if (skipBtn) skipBtn.style.display = nowDone ? 'none' : '';
+
     var dot = document.querySelector('.dot[data-ci="' + ci + '"][data-tid="' + tid + '"]');
     if (dot) {
       if (nowDone) dot.classList.add('filled');
       else         dot.classList.remove('filled');
     }
 
-    // Show/hide celebration
+    var allDone = tasks.every(function(t) { return completed[ci][t.id]; });
+    var cel = document.querySelector('.celebration[data-ci="' + ci + '"]');
+    if (cel) cel.style.display = allDone ? 'flex' : 'none';
+  }
+
+  function handleSkip(ci, tid) {
+    var tasks = currentMode === 'morning' ? MORNING_TASKS : EVENING_TASKS;
+    completed[ci][tid] = 'skipped';
+
+    var tile = document.querySelector('.tile[data-ci="' + ci + '"][data-tid="' + tid + '"]');
+    if (tile) {
+      tile.classList.remove('completed');
+      tile.classList.add('skipped');
+      var chk = tile.querySelector('.checkmark');
+      if (chk) chk.textContent = '⏭';
+    }
+
+    var skipBtn = document.querySelector('.skip-btn[data-ci="' + ci + '"][data-skip-tid="' + tid + '"]');
+    if (skipBtn) skipBtn.style.display = 'none';
+
+    var dot = document.querySelector('.dot[data-ci="' + ci + '"][data-tid="' + tid + '"]');
+    if (dot) dot.classList.add('filled');
+
     var allDone = tasks.every(function(t) { return completed[ci][t.id]; });
     var cel = document.querySelector('.celebration[data-ci="' + ci + '"]');
     if (cel) cel.style.display = allDone ? 'flex' : 'none';
@@ -692,12 +749,12 @@
       var t = tasks[i];
       var tile = document.querySelector('.tile[data-ci="' + ci + '"][data-tid="' + t.id + '"]');
       if (tile) {
-        tile.classList.remove('completed');
-        if (t.svg) {
-          var ico = tile.querySelector('.tile-icon');
-          if (ico) ico.innerHTML = toothbrushSVG(false);
-        }
+        tile.classList.remove('completed', 'skipped');
+        var chk = tile.querySelector('.checkmark');
+        if (chk) chk.textContent = '✅';
       }
+      var skipBtn = document.querySelector('.skip-btn[data-ci="' + ci + '"][data-skip-tid="' + t.id + '"]');
+      if (skipBtn) skipBtn.style.display = '';
       var dot = document.querySelector('.dot[data-ci="' + ci + '"][data-tid="' + t.id + '"]');
       if (dot) dot.classList.remove('filled');
     }
