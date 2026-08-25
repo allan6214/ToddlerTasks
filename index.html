@@ -392,7 +392,7 @@
   var MORNING_TASKS = [
     { id: 'wake',      label: 'Wake Up',       emoji: '🌞' },
     { id: 'potty',     label: 'Potty',         emoji: '🚽' },
-    { id: 'brush-am',  label: 'Brush Teeth',   emoji: '🪥' },
+    { id: 'brush-am',  label: 'Brush Teeth',   svg: true  },
     { id: 'dress',     label: 'Get Dressed',   emoji: '👕' },
     { id: 'breakfast', label: 'Eat Breakfast', emoji: '🥣' },
     { id: 'bag',       label: 'Pack Bag',      emoji: '🎒' },
@@ -401,7 +401,7 @@
   var EVENING_TASKS = [
     { id: 'dinner',   label: 'Dinner',        emoji: '🍽️' },
     { id: 'bath',     label: 'Bath Time',     emoji: '🛁', skippable: true },
-    { id: 'brush-pm', label: 'Brush Teeth',   emoji: '🪥' },
+    { id: 'brush-pm', label: 'Brush Teeth',   svg: true  },
     { id: 'pjs',      label: 'Put On PJs',    emoji: '👕' },
     { id: 'potty-pm', label: 'Use Potty',     emoji: '🚽' },
     { id: 'story',    label: 'Story Time',    emoji: '📚' },
@@ -440,6 +440,28 @@
     var dA = Math.abs(h - 8.5);  dA = Math.min(dA, 24 - dA);
     var dB = Math.abs(h - 19);   dB = Math.min(dB, 24 - dB);
     return dA <= dB ? 'morning' : 'evening';
+  }
+
+  /* ── Toothbrush SVG (🪥 isn't supported on iOS < 14) ──────────────────── */
+  function toothbrushSVG(state) {
+    // state: 'done', 'skipped', or falsy
+    var h  = state === 'done' ? 'rgba(255,255,255,0.88)' : '#3A9FCC';
+    var b  = state === 'done' ? '#7B6CF6' : '#FFFFFF';
+    var gr = state === 'done' ? '#7B6CF6' : 'rgba(255,255,255,0.38)';
+    var tufts = '', ridges = '', xs = [6,14,22,30,38], ys = [66,78,90], i;
+    for (i = 0; i < xs.length; i++) {
+      tufts += '<rect x="' + xs[i] + '" y="0" width="6" height="22" rx="3" fill="' + b + '" opacity="0.93"/>';
+    }
+    for (i = 0; i < ys.length; i++) {
+      ridges += '<rect x="17" y="' + ys[i] + '" width="10" height="5" rx="2.5" fill="' + gr + '"/>';
+    }
+    return '<svg viewBox="0 0 44 130" width="34" height="64" xmlns="http://www.w3.org/2000/svg">'
+      + tufts
+      + '<rect x="2" y="20" width="40" height="20" rx="10" fill="' + h + '"/>'
+      + '<rect x="18" y="38" width="8" height="14" rx="4" fill="' + h + '"/>'
+      + '<rect x="14" y="50" width="16" height="74" rx="8" fill="' + h + '"/>'
+      + ridges
+      + '</svg>';
   }
 
   /* ── CSS variable helper ────────────────────────────────────────────────── */
@@ -549,7 +571,11 @@
 
     var icon = document.createElement('div');
     icon.className = 'tile-icon';
-    icon.textContent = task.emoji;
+    if (task.svg) {
+      icon.innerHTML = toothbrushSVG(val);
+    } else {
+      icon.textContent = task.emoji;
+    }
 
     var label = document.createElement('div');
     label.className = 'tile-label';
@@ -695,12 +721,17 @@
     completed[ci][tid] = cur === 'done' ? undefined : 'done';
     var nowDone = completed[ci][tid] === 'done';
 
+    var task = findTask(tasks, tid);
     var tile = document.querySelector('.tile[data-ci="' + ci + '"][data-tid="' + tid + '"]');
     if (tile) {
       tile.classList.remove('completed', 'skipped');
       if (nowDone) tile.classList.add('completed');
       var chk = tile.querySelector('.checkmark');
       if (chk) chk.textContent = '✅';
+      if (task && task.svg) {
+        var ico = tile.querySelector('.tile-icon');
+        if (ico) ico.innerHTML = toothbrushSVG(nowDone ? 'done' : null);
+      }
     }
 
     // Show/hide skip button
@@ -752,6 +783,10 @@
         tile.classList.remove('completed', 'skipped');
         var chk = tile.querySelector('.checkmark');
         if (chk) chk.textContent = '✅';
+        if (t.svg) {
+          var ico = tile.querySelector('.tile-icon');
+          if (ico) ico.innerHTML = toothbrushSVG(null);
+        }
       }
       var skipBtn = document.querySelector('.skip-btn[data-ci="' + ci + '"][data-skip-tid="' + t.id + '"]');
       if (skipBtn) skipBtn.style.display = '';
